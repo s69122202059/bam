@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><title>ระบบบัญชี</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--tx:#1b2430;--mut:#667085;--bd:#dfe3ea;--pri:#1a5fd0;--pt:#fff;--ok:#16794c;--warn:#b54708;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--tx:#e8ecf2;--mut:#98a2b3;--bd:#2c3542;--pri:#5b9bff;--pt:#0b1220;--ok:#4cc38a;--warn:#f0a35e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b222b;--tx:#e8ecf2;--mut:#98a2b3;--bd:#2c3542;--pri:#5b9bff;--pt:#0b1220;--ok:#4cc38a;--warn:#f0a35e;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 Sarabun,"Noto Sans Thai",system-ui,sans-serif}
+.wrap{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+nav{background:var(--card);border-right:1px solid var(--bd);padding:16px 10px;position:sticky;top:0;align-self:start;height:100vh}
+nav h1{font-size:17px;margin:0 8px 14px}nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--tx);padding:10px 12px;border-radius:8px;font:inherit;cursor:pointer}
+nav button.on{background:var(--pri);color:var(--pt)}
+main{padding:20px;min-width:0}h2{margin:0 0 14px;font-size:20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.k{font-size:12px;color:var(--mut)}.v{font-size:22px;font-weight:600}
+.sc{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}th{font-size:12px;color:var(--mut)}td.n,th.n{text-align:right}
+input,select,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:7px 9px;max-width:100%}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.f label{display:block;font-size:12px;color:var(--mut)}.f input,.f select{width:100%}
+button.b{background:var(--pri);color:var(--pt);border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}button.b.g{background:none;color:var(--pri);border:1px solid var(--bd)}button.b.r{background:none;color:var(--warn);border:1px solid var(--bd)}button:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.tag{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);color:var(--mut)}.tag.c{color:var(--ok);border-color:var(--ok)}.tag.m{color:var(--warn);border-color:var(--warn)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;display:none;z-index:9}
+.msg{max-width:520px;margin:15vh auto;text-align:center;padding:20px}.doc h3{margin:0}.doc .tot{text-align:right;font-size:18px;font-weight:600}
+@media(max-width:760px){.wrap{display:block}nav{position:static;height:auto;display:flex;gap:4px;overflow-x:auto;padding:8px;border-right:0;border-bottom:1px solid var(--bd)}nav h1{display:none}nav button{width:auto;white-space:nowrap}main{padding:12px}}
+@media print{nav,.np,#toast{display:none!important}.wrap{display:block}main{padding:0}.card{border:0}body{background:#fff;color:#000}}
+</style></head><body>
+<div id="app"><div class="msg">กำลังโหลด…</div></div><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const baht=n=>(n/100).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const sat=v=>Math.round(parseFloat(v||0)*100)||0;
+const today=()=>new Date().toISOString().slice(0,10);
+const TY={QUOTATION:['ใบเสนอราคา','QT'],INVOICE:['ใบแจ้งหนี้','IV'],RECEIPT:['ใบเสร็จรับเงิน','RC'],BILLING_NOTE:['ใบวางบิล','BN'],DELIVERY_NOTE:['ใบส่งสินค้า','DN'],CREDIT_NOTE:['ใบลดหนี้','CN'],DEBIT_NOTE:['ใบเพิ่มหนี้','DB']};
+const CONV={QUOTATION:['INVOICE','DELIVERY_NOTE'],INVOICE:['RECEIPT','BILLING_NOTE','DELIVERY_NOTE','CREDIT_NOTE','DEBIT_NOTE']};
+const ACCN={'1100':'เงินสด/ธนาคาร','1200':'ลูกหนี้การค้า','4100':'รายได้จากการขาย'};
+const TABS=[['dash','แดชบอร์ด'],['docs','เอกสาร'],['customers','ลูกค้าและราคา'],['products','สินค้า'],['acct','บัญชีและรายงาน'],['set','ตั้งค่า']];
+const S={uid:null,mode:'in',tab:'dash',products:[],customers:[],prices:[],docs:[],meta:[],loaded:{},draft:null,view:null,editP:null,editC:null,selC:null,busy:false,filter:''};
+let C={};
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3200)}
+async function save(coll,id,data){try{await C[coll].doc(id).set(data);return true}catch(e){toast('บันทึกไม่สำเร็จ (พื้นที่เก็บข้อมูลของเบราว์เซอร์อาจเต็ม)');return false}}
+async function del(coll,id){try{await C[coll].doc(id).delete();return true}catch(e){toast('ลบไม่สำเร็จ');return false}}
+const prof=()=>S.meta.find(m=>m.id==='profile')||{};
+const cust=id=>S.customers.find(c=>c.id===id);
+const prod=id=>S.products.find(p=>p.id===id);
+function priceFor(cid,pid){const sp=S.prices.find(p=>p.id===cid+'__'+pid);if(sp)return{price:sp.price,src:'customer'};const p=prod(pid);return{price:p?p.price:0,src:'standard'}}
+const lineTot=l=>Math.round(l.qty*l.unitPrice*(1-(l.disc||0)/100));
+const docTot=ls=>ls.reduce((s,l)=>s+lineTot(l),0);
+function journal(type,t){let j=null;if(type==='INVOICE'||type==='DEBIT_NOTE')j=[{a:'1200',d:t,c:0},{a:'4100',d:0,c:t}];else if(type==='RECEIPT')j=[{a:'1100',d:t,c:0},{a:'1200',d:0,c:t}];else if(type==='CREDIT_NOTE')j=[{a:'4100',d:t,c:0},{a:'1200',d:0,c:t}];
+ if(j&&j.reduce((s,x)=>s+x.d,0)!==j.reduce((s,x)=>s+x.c,0))throw new Error('บัญชีไม่สมดุล');return j||[]}
+const live=()=>S.docs.filter(d=>d.status!=='VOID');
+function tbal(){const m={};live().forEach(d=>(d.journal||[]).forEach(x=>{m[x.a]=m[x.a]||{d:0,c:0};m[x.a].d+=x.d;m[x.a].c+=x.c}));return m}
+const sign=d=>d.type==='INVOICE'||d.type==='DEBIT_NOTE'?1:d.type==='CREDIT_NOTE'?-1:0;
+function arBy(){const m={};live().forEach(d=>(d.journal||[]).forEach(x=>{if(x.a==='1200')m[d.customerId]=(m[d.customerId]||0)+x.d-x.c}));return m}
+function salesBy(){const m={};live().forEach(d=>{if(sign(d))m[d.customerId]=(m[d.customerId]||0)+sign(d)*d.total});return m}
+const money=n=>`<span>${baht(n)}</span>`;
+
+function render(){
+ const a=$('#app');
+ if(!S.uid){a.innerHTML=authView();return}
+ if(S.fatal){a.innerHTML=`<div class="msg"><h2>เข้าใช้งานไม่ได้</h2><p>${esc(S.fatal)}</p></div>`;return}
+ if(Object.keys(S.loaded).length<5){a.innerHTML='<div class="msg">กำลังโหลดข้อมูล…</div>';return}
+ const body={dash,docs,customers,products,acct,set}[S.tab]();
+ a.innerHTML=`<div class="wrap"><nav class="np"><h1>${esc(prof().name||'ระบบบัญชีออนไลน์')}</h1>${TABS.map(([k,n])=>`<button data-a="tab" data-i="${k}" class="${S.tab===k?'on':''}">${n}</button>`).join('')}<button data-a="logout">ออกจากระบบ</button></nav><main>${body}</main></div>`;
+}
+function dash(){
+ const ms=today().slice(0,7);const sales=live().filter(d=>sign(d)&&d.date.slice(0,7)===ms).reduce((s,d)=>s+sign(d)*d.total,0);
+ const ar=Object.values(arBy()).reduce((s,x)=>s+x,0);
+ const rec=S.docs.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
+ return `<h2>แดชบอร์ด</h2><div class="grid"><div class="card"><div class="k">ยอดขายเดือนนี้ (บาท)</div><div class="v">${baht(sales)}</div></div><div class="card"><div class="k">ลูกหนี้ค้างชำระ (บาท)</div><div class="v">${baht(ar)}</div></div><div class="card"><div class="k">ลูกค้า</div><div class="v">${S.customers.length}</div></div><div class="card"><div class="k">สินค้า</div><div class="v">${S.products.length}</div></div></div>
+ <div class="card"><b>เอกสารล่าสุด</b><div class="sc">${docTable(rec)}</div></div>
+ ${S.customers.length?'':'<div class="card">เริ่มต้น: เพิ่มสินค้า → เพิ่มลูกค้า → ตั้งราคาพิเศษของลูกค้า → สร้างเอกสาร</div>'}`}
+function docTable(ds){if(!ds.length)return'<p class="k">ยังไม่มีเอกสาร</p>';
+ return `<table><tr><th>เลขที่</th><th>ชนิด</th><th>วันที่</th><th>ลูกค้า</th><th class="n">ยอดรวม</th><th>สถานะ</th><th></th></tr>${ds.map(d=>`<tr><td>${esc(d.number)}</td><td>${TY[d.type][0]}</td><td>${esc(d.date)}</td><td>${esc(d.customerName)}</td><td class="n">${baht(d.total)}</td><td>${d.status==='PAID'?'ชำระแล้ว':d.status==='VOID'?'ยกเลิก':'ออกแล้ว'}</td><td><button class="b g" data-a="view" data-i="${d.id}">เปิด</button></td></tr>`).join('')}</table>`}
+function docs(){
+ if(S.draft)return draftView();
+ if(S.view)return detail(S.docs.find(d=>d.id===S.view));
+ const ds=S.docs.filter(d=>!S.filter||d.type===S.filter).sort((a,b)=>b.createdAt-a.createdAt);
+ return `<h2>เอกสาร</h2><div class="row np">${Object.entries(TY).map(([k,v])=>`<button class="b" data-a="newDoc" data-i="${k}">+ ${v[0]}</button>`).join('')}</div>
+ <div class="row np"><select data-f="filter"><option value="">ทุกชนิด</option>${Object.entries(TY).map(([k,v])=>`<option value="${k}" ${S.filter===k?'selected':''}>${v[0]}</option>`).join('')}</select></div><div class="card sc">${docTable(ds)}</div>`}
+function draftView(){
+ const d=S.draft;const t=docTot(d.lines);
+ const opts=(sel)=>`<option value="">เลือกสินค้า</option>`+S.products.filter(p=>p.active!==false).map(p=>`<option value="${p.id}" ${sel===p.id?'selected':''}>${esc(p.sku)} ${esc(p.name)}</option>`).join('');
+ return `<h2>${TY[d.type][0]}ใหม่</h2><div class="card"><div class="f"><div><label>ลูกค้า</label><select data-f="dcust"><option value="">เลือกลูกค้า</option>${S.customers.map(c=>`<option value="${c.id}" ${d.customerId===c.id?'selected':''}>${esc(c.code)} ${esc(c.name)}</option>`).join('')}</select></div>
+ <div><label>วันที่</label><input type="date" value="${d.date}" data-f="ddate"></div><div><label>ครบกำหนด</label><input type="date" value="${d.due||''}" data-f="ddue"></div><div><label>หมายเหตุ</label><input value="${esc(d.note)}" data-f="dnote"></div></div></div>
+ <div class="card sc"><table><tr><th>สินค้า</th><th class="n">จำนวน</th><th class="n">ราคา/หน่วย (บาท)</th><th>ที่มาราคา</th><th class="n">ส่วนลด %</th><th class="n">รวม</th><th></th></tr>
+ ${d.lines.map((l,i)=>`<tr><td><select data-f="lprod" data-i="${i}">${opts(l.productId)}</select></td><td class="n"><input type="number" min="0" step="any" style="width:80px" value="${l.qty}" data-f="lqty" data-i="${i}"></td><td class="n"><input type="number" min="0" step="0.01" style="width:110px" value="${(l.unitPrice/100).toFixed(2)}" data-f="lprice" data-i="${i}"></td><td><span class="tag ${l.src==='customer'?'c':l.src==='manual'?'m':''}">${l.src==='customer'?'ราคาลูกค้า':l.src==='manual'?'แก้เอง':'ราคาปกติ'}</span></td><td class="n"><input type="number" min="0" max="100" style="width:70px" value="${l.disc||0}" data-f="ldisc" data-i="${i}"></td><td class="n">${baht(lineTot(l))}</td><td><button class="b r" data-a="delLine" data-i="${i}">ลบ</button></td></tr>`).join('')}</table>
+ <div class="row"><button class="b g" data-a="addLine">+ เพิ่มรายการ</button></div><div class="tot">ยอดรวม ${baht(t)} บาท</div></div>
+ <div class="row"><button class="b" data-a="saveDoc" ${S.busy?'disabled':''}>บันทึกเอกสาร</button><button class="b g" data-a="cancelDoc">ยกเลิก</button></div>`}
+function detail(d){
+ if(!d)return'';const c=cust(d.customerId)||{};const p=prof();
+ return `<div class="row np"><button class="b g" data-a="close">← กลับ</button><button class="b" data-a="print">พิมพ์ / บันทึก PDF</button>${d.status==='ISSUED'&&(CONV[d.type]||[]).map(t=>`<button class="b g" data-a="conv" data-i="${d.id}|${t}">สร้าง${TY[t][0]}</button>`).join('')||''}</div>
+ <div class="card doc"><h3>${esc(p.name||'')}</h3><div class="k">${esc(p.address||'')} ${esc(p.phone||'')}</div><h2 style="margin-top:14px">${TY[d.type][0]}</h2><div>เลขที่ ${esc(d.number)} · วันที่ ${esc(d.date)}${d.due?' · ครบกำหนด '+esc(d.due):''}</div>
+ <p><b>${esc(c.name||d.customerName)}</b><br>${esc(c.address||'')}<br>${c.taxId?'เลขประจำตัวผู้เสียภาษี '+esc(c.taxId):''}</p>
+ <div class="sc"><table><tr><th>รายการ</th><th class="n">จำนวน</th><th class="n">ราคา/หน่วย</th><th class="n">ส่วนลด%</th><th class="n">รวม</th></tr>${d.lines.map(l=>`<tr><td>${esc(l.desc)}</td><td class="n">${l.qty}</td><td class="n">${baht(l.unitPrice)}</td><td class="n">${l.disc||0}</td><td class="n">${baht(l.total)}</td></tr>`).join('')}</table></div>
+ <div class="tot">ยอดรวมทั้งสิ้น ${baht(d.total)} บาท</div>${d.note?'<p>หมายเหตุ: '+esc(d.note)+'</p>':''}</div>`}
+function customers(){
+ if(S.editC)return custForm();
+ if(S.selC){const c=cust(S.selC);return `<div class="row np"><button class="b g" data-a="closeC">← กลับ</button></div><h2>ราคาพิเศษของ ${esc(c.name)}</h2><p class="k">1 สินค้าต่อ 1 ลูกค้าต่อ 1 ราคา เว้นว่างไว้ = ใช้ราคาปกติ เอกสารใหม่จะใช้ราคานี้อัตโนมัติ</p><div class="card sc"><table><tr><th>SKU</th><th>สินค้า</th><th class="n">ราคาปกติ</th><th class="n">ราคาของลูกค้านี้ (บาท)</th></tr>${S.products.map(p=>{const sp=S.prices.find(x=>x.id===c.id+'__'+p.id);return `<tr><td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td class="n">${baht(p.price)}</td><td class="n"><input type="number" min="0" step="0.01" style="width:120px" value="${sp?(sp.price/100).toFixed(2):''}" data-f="cprice" data-i="${p.id}"></td></tr>`}).join('')||'<tr><td>เพิ่มสินค้าก่อน</td></tr>'}</table></div>`}
+ return `<h2>ลูกค้าและราคา</h2><div class="row np"><button class="b" data-a="newC">+ เพิ่มลูกค้า</button></div><div class="card sc"><table><tr><th>รหัส</th><th>ชื่อ</th><th>โทร</th><th class="n">เครดิต(วัน)</th><th></th></tr>${S.customers.slice().sort((a,b)=>a.code.localeCompare(b.code)).map(c=>`<tr><td>${esc(c.code)}</td><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td class="n">${c.creditDays||0}</td><td><button class="b" data-a="selC" data-i="${c.id}">ราคาพิเศษ (${S.prices.filter(p=>p.customerId===c.id).length})</button> <button class="b g" data-a="editC" data-i="${c.id}">แก้ไข</button></td></tr>`).join('')||'<tr><td>ยังไม่มีลูกค้า</td></tr>'}</table></div>`}
+function custForm(){const c=S.editC;const F=(k,l,t='text')=>`<div><label>${l}</label><input type="${t}" id="c-${k}" value="${esc(c[k]??'')}"></div>`;
+ return `<h2>${c.id?'แก้ไข':'เพิ่ม'}ลูกค้า</h2><div class="card"><div class="f">${F('code','รหัสลูกค้า')}${F('name','ชื่อบุคคล/บริษัท')}${F('taxId','เลขประจำตัวผู้เสียภาษี')}${F('address','ที่อยู่')}${F('shipAddress','ที่อยู่จัดส่ง')}${F('phone','โทรศัพท์')}${F('email','อีเมล')}${F('contact','ผู้ติดต่อ')}${F('creditDays','เครดิตเทอม (วัน)','number')}${F('creditLimit','วงเงินเครดิต (บาท)','number')}</div><div class="row"><button class="b" data-a="saveC">บันทึก</button><button class="b g" data-a="closeC">ยกเลิก</button>${c.id?'<button class="b r" data-a="delC">ลบ</button>':''}</div></div>`}
+function products(){
+ if(S.editP){const p=S.editP;return `<h2>${p.id?'แก้ไข':'เพิ่ม'}สินค้า</h2><div class="card"><div class="f"><div><label>รหัส SKU</label><input id="p-sku" value="${esc(p.sku||'')}"></div><div><label>ชื่อสินค้า</label><input id="p-name" value="${esc(p.name||'')}"></div><div><label>หมวดหมู่</label><input id="p-cat" value="${esc(p.category||'')}"></div><div><label>หน่วยนับ</label><input id="p-unit" value="${esc(p.unit||'ชิ้น')}"></div><div><label>ราคาขายปกติ (บาท)</label><input type="number" step="0.01" id="p-price" value="${p.price!=null?(p.price/100).toFixed(2):''}"></div><div><label>สถานะ</label><select id="p-act"><option value="1">ใช้งาน</option><option value="0" ${p.active===false?'selected':''}>ปิดใช้งาน</option></select></div></div><div class="row"><button class="b" data-a="saveP">บันทึก</button><button class="b g" data-a="closeP">ยกเลิก</button>${p.id?'<button class="b r" data-a="delP">ลบ</button>':''}</div></div>`}
+ return `<h2>สินค้า</h2><div class="row np"><button class="b" data-a="newP">+ เพิ่มสินค้า</button></div><div class="card sc"><table><tr><th>SKU</th><th>ชื่อ</th><th>หมวด</th><th>หน่วย</th><th class="n">ราคาปกติ</th><th></th></tr>${S.products.slice().sort((a,b)=>a.sku.localeCompare(b.sku)).map(p=>`<tr><td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${esc(p.unit)}</td><td class="n">${baht(p.price)}</td><td><button class="b g" data-a="editP" data-i="${p.id}">แก้ไข</button></td></tr>`).join('')||'<tr><td>ยังไม่มีสินค้า</td></tr>'}</table></div>`}
+function acct(){
+ const tb=tbal(),ar=arBy(),sb=salesBy();let D=0,Cr=0;
+ const rows=Object.keys(ACCN).map(k=>{const x=tb[k]||{d:0,c:0};D+=x.d;Cr+=x.c;return `<tr><td>${k}</td><td>${ACCN[k]}</td><td class="n">${baht(x.d)}</td><td class="n">${baht(x.c)}</td></tr>`}).join('');
+ const je=live().filter(d=>d.journal&&d.journal.length).sort((a,b)=>b.date.localeCompare(a.date));
+ return `<h2>บัญชีและรายงาน</h2><div class="card sc"><b>งบทดลอง</b><table><tr><th>รหัส</th><th>ชื่อบัญชี</th><th class="n">เดบิต</th><th class="n">เครดิต</th></tr>${rows}<tr><td></td><td><b>รวม ${D===Cr?'(สมดุล)':'(ไม่สมดุล)'}</b></td><td class="n"><b>${baht(D)}</b></td><td class="n"><b>${baht(Cr)}</b></td></tr></table></div>
+ <div class="card sc"><b>ลูกหนี้ค้างชำระ / ยอดขายแยกตามลูกค้า</b><table><tr><th>ลูกค้า</th><th class="n">ยอดขายสุทธิ</th><th class="n">ลูกหนี้ค้างชำระ</th></tr>${S.customers.map(c=>`<tr><td>${esc(c.name)}</td><td class="n">${baht(sb[c.id]||0)}</td><td class="n">${baht(ar[c.id]||0)}</td></tr>`).join('')||'<tr><td>-</td></tr>'}</table></div>
+ <div class="card sc"><b>สมุดรายวัน</b><table><tr><th>วันที่</th><th>เอกสาร</th><th>บัญชี</th><th class="n">เดบิต</th><th class="n">เครดิต</th></tr>${je.map(d=>d.journal.map((x,i)=>`<tr><td>${i?'':esc(d.date)}</td><td>${i?'':esc(d.number)}</td><td>${x.a} ${ACCN[x.a]}</td><td class="n">${x.d?baht(x.d):''}</td><td class="n">${x.c?baht(x.c):''}</td></tr>`).join('')).join('')||'<tr><td>ยังไม่มีรายการ</td></tr>'}</table></div>`}
+function set(){const p=prof();return `<h2>ตั้งค่า</h2><div class="card"><div class="f"><div><label>ชื่อธุรกิจ (แสดงบนเอกสาร)</label><input id="s-name" value="${esc(p.name||'')}"></div><div><label>ที่อยู่</label><input id="s-addr" value="${esc(p.address||'')}"></div><div><label>โทรศัพท์</label><input id="s-tel" value="${esc(p.phone||'')}"></div></div><div class="row"><button class="b" data-a="saveS">บันทึก</button></div><p class="k">ธุรกิจนี้ไม่จด VAT จึงไม่มีภาษีมูลค่าเพิ่มและหัก ณ ที่จ่ายในเอกสาร</p></div><div class="card"><b>สำรองข้อมูล</b><p class="k">ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้ ควรสำรองเป็นไฟล์สม่ำเสมอ และใช้ไฟล์นี้ย้ายไปเครื่องอื่นได้</p><div class="row"><button class="b" data-a="export">ดาวน์โหลดไฟล์สำรอง</button><label class="b g" style="cursor:pointer">นำเข้าไฟล์สำรอง<input type="file" accept=".json" data-f="import" style="display:none"></label></div></div>`}
+
+function newDraft(type,src){return{id:crypto.randomUUID(),type,customerId:src?src.customerId:'',date:today(),due:'',note:'',sourceId:src?src.id:'',lines:src?src.lines.map(l=>({productId:l.productId,desc:l.desc,qty:l.qty,unitPrice:l.unitPrice,src:l.src,disc:l.disc||0})):[{productId:'',qty:1,unitPrice:0,src:'standard',disc:0}]}}
+function setLineProd(l,pid){l.productId=pid;const p=prod(pid);l.desc=p?p.name:'';if(p&&l.src!=='manual'||p&&!l.unitPrice){const r=priceFor(S.draft.customerId,pid);l.unitPrice=r.price;l.src=r.src}}
+const A={
+ tab:i=>{S.tab=i;S.draft=S.view=S.editP=S.editC=S.selC=null},
+ newDoc:i=>{S.draft=newDraft(i)},cancelDoc:()=>{S.draft=null},view:i=>{S.view=i},close:()=>{S.view=null},print:()=>window.print(),
+ addLine:()=>S.draft.lines.push({productId:'',qty:1,unitPrice:0,src:'standard',disc:0}),delLine:i=>{S.draft.lines.splice(+i,1);if(!S.draft.lines.length)A.addLine()},
+ conv:i=>{const[id,t]=i.split('|');S.draft=newDraft(t,S.docs.find(d=>d.id===id));S.view=null},
+ newP:()=>{S.editP={}},editP:i=>{S.editP={...prod(i)}},closeP:()=>{S.editP=null},
+ newC:()=>{S.editC={}},editC:i=>{S.editC={...cust(i)}},closeC:()=>{S.editC=null;S.selC=null},selC:i=>{S.selC=i},
+ saveS:async()=>{if(await save('meta','profile',{name:$('#s-name').value.trim(),address:$('#s-addr').value.trim(),phone:$('#s-tel').value.trim()}))toast('บันทึกแล้ว')},
+ saveP:async()=>{const p=S.editP,sku=$('#p-sku').value.trim(),name=$('#p-name').value.trim();if(!sku||!name)return toast('กรุณากรอก SKU และชื่อสินค้า');
+  if(S.products.some(x=>x.sku.toLowerCase()===sku.toLowerCase()&&x.id!==p.id))return toast('รหัส SKU นี้ถูกใช้แล้ว');
+  const id=p.id||crypto.randomUUID();if(await save('products',id,{sku,name,category:$('#p-cat').value.trim(),unit:$('#p-unit').value.trim()||'ชิ้น',price:sat($('#p-price').value),active:$('#p-act').value==='1'})){S.editP=null;toast('บันทึกสินค้าแล้ว')}},
+ delP:async()=>{const id=S.editP.id;if(S.docs.some(d=>d.lines.some(l=>l.productId===id)))return toast('สินค้านี้ถูกใช้ในเอกสารแล้ว ลบไม่ได้ (ปิดใช้งานแทน)');
+  if(!confirm('ลบสินค้านี้?'))return;await Promise.all(S.prices.filter(x=>x.productId===id).map(x=>del('prices',x.id)));if(await del('products',id))S.editP=null},
+ saveC:async()=>{const c=S.editC,v=k=>$('#c-'+k).value.trim(),code=v('code'),name=v('name');if(!code||!name)return toast('กรุณากรอกรหัสและชื่อลูกค้า');
+  if(S.customers.some(x=>x.code.toLowerCase()===code.toLowerCase()&&x.id!==c.id))return toast('รหัสลูกค้านี้ถูกใช้แล้ว');
+  const id=c.id||crypto.randomUUID();if(await save('customers',id,{code,name,taxId:v('taxId'),address:v('address'),shipAddress:v('shipAddress'),phone:v('phone'),email:v('email'),contact:v('contact'),creditDays:parseInt(v('creditDays'))||0,creditLimit:sat(v('creditLimit'))})){S.editC=null;toast('บันทึกลูกค้าแล้ว')}},
+ delC:async()=>{const id=S.editC.id;if(S.docs.some(d=>d.customerId===id))return toast('ลูกค้านี้มีเอกสารแล้ว ลบไม่ได้');if(!confirm('ลบลูกค้านี้?'))return;
+  await Promise.all(S.prices.filter(x=>x.customerId===id).map(x=>del('prices',x.id)));if(await del('customers',id))S.editC=null},
+ saveDoc:async()=>{const d=S.draft;if(!d.customerId)return toast('กรุณาเลือกลูกค้า');const ls=d.lines.filter(l=>l.productId||l.desc);if(!ls.length||ls.some(l=>!(l.qty>0)))return toast('กรุณาเลือกสินค้าและจำนวนให้ถูกต้อง');
+  S.busy=true;render();const c=cust(d.customerId),y=d.date.slice(0,4),pre=TY[d.type][1]+y+'-';
+  const mx=S.docs.filter(x=>x.type===d.type&&x.number.startsWith(pre)).reduce((m,x)=>Math.max(m,parseInt(x.number.slice(pre.length))||0),0);
+  const lines=ls.map(l=>({productId:l.productId,desc:l.desc||prod(l.productId)?.name||'',qty:l.qty,unitPrice:l.unitPrice,src:l.src,disc:l.disc||0,total:lineTot(l)}));const total=docTot(lines);
+  let j;try{j=journal(d.type,total)}catch(e){S.busy=false;return toast(e.message)}
+  const ok=await save('docs',d.id,{type:d.type,number:pre+String(mx+1).padStart(4,'0'),date:d.date,due:d.due,customerId:c.id,customerName:c.name,lines,total,status:'ISSUED',sourceId:d.sourceId,journal:j,note:d.note,createdAt:Date.now()});
+  if(ok&&d.type==='RECEIPT'&&d.sourceId){const s=S.docs.find(x=>x.id===d.sourceId);if(s)await save('docs',s.id,{...s,status:'PAID'})}
+  S.busy=false;if(ok){S.draft=null;S.view=d.id;toast('บันทึกเอกสารแล้ว')}}
+};
+const F={
+ filter:v=>{S.filter=v},dcust:v=>{S.draft.customerId=v;S.draft.lines.forEach(l=>{if(l.productId&&l.src!=='manual')setLineProd(l,l.productId)})},ddate:v=>{S.draft.date=v},ddue:v=>{S.draft.due=v},dnote:v=>{S.draft.note=v},
+ lprod:(v,i)=>{const l=S.draft.lines[i];l.src='standard';setLineProd(l,v)},lqty:(v,i)=>{S.draft.lines[i].qty=parseFloat(v)||0},lprice:(v,i)=>{const l=S.draft.lines[i];l.unitPrice=sat(v);l.src='manual'},ldisc:(v,i)=>{S.draft.lines[i].disc=Math.min(100,Math.max(0,parseFloat(v)||0))},
+ cprice:async(v,pid)=>{const id=S.selC+'__'+pid;if(v.trim()==='')await del('prices',id);else await save('prices',id,{customerId:S.selC,productId:pid,price:sat(v)})}
+};
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-a]');if(!t)return;await A[t.dataset.a]?.(t.dataset.i);render()});
+document.addEventListener('change',async e=>{const t=e.target.closest('[data-f]');if(!t)return;await F[t.dataset.f]?.(t.value,t.dataset.i,t);render()});
+
+const LS=localStorage,NAMES=['products','customers','prices','docs','meta'],M={};
+const rd=(k,d)=>{try{return JSON.parse(LS.getItem(k))??d}catch{return d}};
+const wr=(k,v)=>LS.setItem(k,JSON.stringify(v));
+const b64=u=>btoa(String.fromCharCode(...u));
+async function hashPw(pw,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+ const b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:Uint8Array.from(atob(salt),c=>c.charCodeAt(0)),iterations:150000,hash:'SHA-256'},k,256);return b64(new Uint8Array(b))}
+function sync(){NAMES.forEach(n=>{S[n]=Object.entries(M[n]).map(([id,d])=>({...d,id}));S.loaded[n]=1})}
+function load(uid){S.uid=uid;NAMES.forEach(n=>{M[n]=rd('acc:'+uid+':'+n,{});
+ C[n]={doc:id=>({set:async d=>{M[n][id]=JSON.parse(JSON.stringify(d));wr('acc:'+uid+':'+n,M[n]);sync()},delete:async()=>{delete M[n][id];wr('acc:'+uid+':'+n,M[n]);sync()}})}});sync()}
+function authView(){const up=S.mode==='up';
+ return `<div class="msg card"><h2>ระบบบัญชี</h2><p class="k">${up?'สมัครสมาชิกใหม่':'เข้าสู่ระบบ'}</p><div class="f" style="text-align:left">${up?'<div><label>ชื่อ</label><input id="a-name"></div>':''}<div><label>อีเมล</label><input id="a-email" type="email" autocomplete="username"></div><div><label>รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)</label><input id="a-pw" type="password" autocomplete="${up?'new-password':'current-password'}"></div></div>
+ <div class="row" style="justify-content:center"><button class="b" data-a="${up?'signup':'login'}">${up?'สมัครสมาชิก':'เข้าสู่ระบบ'}</button><button class="b g" data-a="mode">${up?'มีบัญชีแล้ว':'สมัครสมาชิก'}</button></div></div>`}
+Object.assign(A,{
+ mode:()=>{S.mode=S.mode==='up'?'in':'up'},
+ signup:async()=>{const email=$('#a-email').value.trim().toLowerCase(),pw=$('#a-pw').value,name=$('#a-name').value.trim();
+  if(!email||!name||pw.length<8)return toast('กรุณากรอกข้อมูลให้ครบ และรหัสผ่านอย่างน้อย 8 ตัวอักษร');
+  const U=rd('acc:users',{});if(U[email])return toast('อีเมลนี้ถูกใช้แล้ว');
+  const salt=b64(crypto.getRandomValues(new Uint8Array(16))),uid=crypto.randomUUID();U[email]={uid,name,salt,hash:await hashPw(pw,salt)};wr('acc:users',U);sessionStorage.setItem('acc:sid',uid);load(uid)},
+ login:async()=>{const email=$('#a-email').value.trim().toLowerCase(),u=rd('acc:users',{})[email];
+  if(!u||await hashPw($('#a-pw').value,u.salt)!==u.hash)return toast('อีเมลหรือรหัสผ่านไม่ถูกต้อง');sessionStorage.setItem('acc:sid',u.uid);load(u.uid)},
+ logout:()=>{sessionStorage.removeItem('acc:sid');S.uid=null;S.tab='dash';S.draft=S.view=S.editP=S.editC=S.selC=null;S.loaded={}},
+ export:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({v:1,data:M})],{type:'application/json'}));a.download='acc-backup-'+today()+'.json';a.click();toast('ดาวน์โหลดไฟล์สำรองแล้ว')}
+});
+F.import=(v,i,el)=>{const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result).data;if(!confirm('นำเข้าจะแทนที่ข้อมูลปัจจุบันทั้งหมด ต้องการต่อหรือไม่?'))return;
+ NAMES.forEach(n=>{M[n]=d[n]||{};wr('acc:'+S.uid+':'+n,M[n])});sync();render();toast('นำเข้าข้อมูลแล้ว')}catch(e){toast('ไฟล์สำรองไม่ถูกต้อง')}};r.readAsText(f)};
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='a-pw')document.querySelector('[data-a="login"],[data-a="signup"]')?.click()});
+(()=>{const sid=sessionStorage.getItem('acc:sid');if(sid&&Object.values(rd('acc:users',{})).some(u=>u.uid===sid))load(sid);render()})();
+</script></body></html>
